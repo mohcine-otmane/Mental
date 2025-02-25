@@ -1,16 +1,18 @@
 ﻿using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Threading;
 
 namespace Mental
 {
     public partial class MainWindow : Window
     {
-        private int num1, num2, score = 0;
+        private int num1, num2, score = 0, streak = 0, difficulty = 1;
         private Random random = new Random();
         private DispatcherTimer timer;
         private int timeLeft = 5;
+        private bool answered = false;
 
         public MainWindow()
         {
@@ -29,7 +31,8 @@ namespace Mental
         private void StartTimer()
         {
             timeLeft = 5;
-            TimerText.Text = $"Time Left: {timeLeft}s";
+            answered = false;
+            TimerText.Text = $"{timeLeft}s";
             timer.Start();
         }
 
@@ -39,36 +42,27 @@ namespace Mental
 
             if (timeLeft > 0)
             {
-                TimerText.Text = $"Time Left: {timeLeft}s";
+                TimerText.Text = $"{timeLeft}s";
             }
             else
             {
                 timer.Stop();
-                ShowAnswer();
-            }
-        }
-
-        private void ShowAnswer()
-        {
-            ProblemText.Text = $"Answer: {num1 * num2}";
-            TimerText.Text = "Next Question in 1s...";
-
-            DispatcherTimer waitTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromSeconds(1)
-            };
-            waitTimer.Tick += (s, e) =>
-            {
-                waitTimer.Stop();
+                if (!answered)
+                {
+                    HandleIncorrect();
+                }
                 GenerateNewProblem();
-            };
-            waitTimer.Start();
+            }
         }
 
         private void GenerateNewProblem()
         {
-            num1 = random.Next(1, 20);
-            num2 = random.Next(1, 20);
+            int min = (int)Math.Pow(10, difficulty - 1);
+            int max = (int)Math.Pow(10, difficulty) - 1;
+
+            num1 = random.Next(min, max);
+            num2 = random.Next(min, max);
+
             ProblemText.Text = $"{num1} × {num2}";
             AnswerInput.Clear();
             StartTimer();
@@ -76,16 +70,69 @@ namespace Mental
 
         private void SubmitAnswer(object sender, RoutedEventArgs e)
         {
+            if (answered) return; // Prevent multiple answers
+
             if (int.TryParse(AnswerInput.Text, out int userAnswer) && userAnswer == num1 * num2)
             {
                 score++;
+                streak++;
                 ScoreText.Text = $"Score: {score}";
+                StreakText.Text = $"Streak: {streak}";
+
+                if (streak == 5)
+                {
+                    difficulty++;
+                    streak = 0;
+                    DifficultyText.Text = $"Level: {difficulty}";
+                }
+
+                answered = true;
                 timer.Stop();
                 GenerateNewProblem();
             }
             else
             {
-                MessageBox.Show("Incorrect! Try again.", "Oops!", MessageBoxButton.OK, MessageBoxImage.Warning);
+                HandleIncorrect();
+            }
+        }
+
+        private void HandleIncorrect()
+        {
+            streak = 0;
+            difficulty = Math.Max(1, difficulty - 1);
+            StreakText.Text = "Streak: 0";
+            DifficultyText.Text = $"Level: {difficulty}";
+            answered = true;
+        }
+
+        private void AnswerInput_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                SubmitAnswer(null, null);
+            }
+        }
+
+        private void CloseWindow(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        private void MinimizeWindow(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeWindow(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }
+
+        private void DragWindow(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                DragMove();
             }
         }
     }
